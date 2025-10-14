@@ -18,7 +18,14 @@
     "docker:inspect": "docker inspect evolu-relay-server",
     "docker:stats": "docker stats evolu-relay-server",
     "docker:clean": "docker-compose down -v && docker system prune -f",
-    "docker:clean:all": "docker-compose down -v && docker system prune -af && docker volume prune -f"
+    "docker:clean:all": "docker-compose down -v && docker system prune -af && docker volume prune -f",
+    "docker:prod:build": "docker build -f Dockerfile.prod -t evoluhq/relay:prod .",
+    "docker:prod:up": "docker-compose -f docker-compose.prod.yml up --build",
+    "docker:prod:up:detached": "docker-compose -f docker-compose.prod.yml up -d --build",
+    "docker:prod:down": "docker-compose -f docker-compose.prod.yml down",
+    "docker:prod:logs": "docker-compose -f docker-compose.prod.yml logs -f evolu-relay",
+    "docker:prod:shell": "docker exec -it evolu-relay-production sh",
+    "docker:prod:test": "bash scripts/test-production-image.sh"
   },
   "dependencies": {
     "@evolu/common": "workspace:*",

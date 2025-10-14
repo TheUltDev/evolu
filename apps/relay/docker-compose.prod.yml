@@ -1,0 +1,70 @@
+services:
+  evolu-relay:
+    container_name: evolu-relay-production
+    image: evoluhq/relay:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.prod
+      args:
+        # Pin to specific versions for production stability
+        # Use "latest" for most recent versions
+        EVOLU_COMMON_VERSION: ${EVOLU_COMMON_VERSION:-latest}
+        EVOLU_NODEJS_VERSION: ${EVOLU_NODEJS_VERSION:-latest}
+        NODE_VERSION: ${NODE_VERSION:-22-alpine}
+      tags:
+        - evoluhq/relay:latest
+        - evoluhq/relay:production
+    ports:
+      - "${PORT:-4000}:4000"
+    volumes:
+      # Persistent data volume for SQLite database
+      - evolu-relay-prod-data:/app/data
+    environment:
+      - NODE_ENV=production
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+      # Add custom environment variables as needed
+      - TZ=${TZ:-UTC}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${MEMORY_LIMIT:-1G}
+          cpus: ${CPU_LIMIT:-1.0}
+        reservations:
+          memory: ${MEMORY_RESERVED:-512M}
+          cpus: ${CPU_RESERVED:-0.5}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "wget --no-verbose --tries=1 --spider http://localhost:4000 2>&1 | grep -q '426 Upgrade Required' || exit 1",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: ${LOG_MAX_SIZE:-50m}
+        max-file: ${LOG_MAX_FILES:-5}
+    networks:
+      - evolu-prod-network
+    security_opt:
+      - no-new-privileges:true
+    read_only: false # Needs write access for SQLite
+    tmpfs:
+      - /tmp:noexec,nosuid,nodev,size=100m
+
+volumes:
+  evolu-relay-prod-data:
+    driver: local
+    name: evolu-relay-prod-data
+
+networks:
+  evolu-prod-network:
+    name: evolu-relay-prod-network
+    driver: bridge
+

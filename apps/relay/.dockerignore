@@ -1,16 +1,42 @@
+# Node modules and dependencies
 node_modules
-.turbo
+npm-debug.log
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Build artifacts
 dist
 *.log
-.env
-.env.local
-.DS_Store
-coverage
-.nyc_output
-*.db
-*.sqlite
+*.tsbuildinfo
+
+# Development files
+.turbo
 .git
 .gitignore
+.env*
+.vscode
+.idea
+
+# Testing
+coverage
+.nyc_output
+
+# Database files (will be in mounted volume)
+data
+*.db
+*.sqlite
+
+# Documentation (not needed in container)
 README.md
-CHANGELOG.md 
-examples
+README.docker.md
+CHANGELOG.md
+
+# Docker files (not needed in build context)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# OS files
+.DS_Store
+Thumbs.db

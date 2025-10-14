@@ -13,16 +13,28 @@ pnpm docker:up
 
 ### Production Deployment
 
+**Using Pre-built Docker Image (Recommended):**
+
 ```bash
-# Complete server setup + deployment
-pnpm deploy:full
+docker pull evoluhq/relay:latest
+docker run -d -p 4000:4000 -v evolu-relay-data:/app/data evoluhq/relay:latest
+```
+
+**Using Docker Compose:**
+
+```bash
+cd apps/relay
+pnpm docker:prod:up
 ```
 
 The relay will be available at `http://localhost:4000` (Docker) or your server's IP:4000 (production)
 
+📚 **See [Production Deployment Guide](./docs/PRODUCTION.md) for comprehensive deployment instructions.**
+
 ## 📖 Documentation
 
-- **[Docker Setup](./README.docker.md)** - Complete Docker containerization guide
+- **[Docker Setup](./README.docker.md)** - Docker development and testing guide
+- **[Production Deployment](./docs/PRODUCTION.md)** - Comprehensive production deployment guide
 
 ## 🔧 Development
 
@@ -56,7 +68,7 @@ pnpm docker:clean        # Clean up everything
 | `pnpm start` | Start the built application                 |
 | `pnpm clean` | Clean build artifacts                       |
 
-### Docker
+### Docker - Development
 
 | Command                   | Description                          |
 | ------------------------- | ------------------------------------ |
@@ -68,6 +80,18 @@ pnpm docker:clean        # Clean up everything
 | `pnpm docker:shell`       | Access running container shell       |
 | `pnpm docker:stats`       | View container resource usage        |
 | `pnpm docker:clean`       | Remove containers and cleanup        |
+
+### Docker - Production
+
+| Command                       | Description                              |
+| ----------------------------- | ---------------------------------------- |
+| `pnpm docker:prod:build`      | Build production image from NPM packages |
+| `pnpm docker:prod:up`         | Start production containers with logs    |
+| `pnpm docker:prod:up:detached`| Start production in background           |
+| `pnpm docker:prod:down`       | Stop production containers               |
+| `pnpm docker:prod:logs`       | View production container logs           |
+| `pnpm docker:prod:shell`      | Access production container shell        |
+| `pnpm docker:prod:test`       | Run automated production image tests     |
 
 ## 📋 Requirements
 
@@ -89,3 +113,4 @@ The relay handles WebSocket connections and data synchronization across all conn
 📚 **Quick Links**:
 
 - [Docker Setup Guide](./README.docker.md) - Local development and testing
+- [Production Deployment Guide](./docs/PRODUCTION.md) - Comprehensive production deployment

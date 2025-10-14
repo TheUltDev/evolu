@@ -19,6 +19,19 @@ jobs:
       contents: read
       attestations: write
       id-token: write
+    strategy:
+      matrix:
+        build_type:
+          - name: development
+            dockerfile: ./apps/relay/Dockerfile
+            context: .
+            tag_suffix: dev
+            description: Development build from monorepo
+          - name: production
+            dockerfile: ./apps/relay/Dockerfile.prod
+            context: ./apps/relay
+            tag_suffix: prod
+            description: Production build from NPM packages
     outputs:
       image: ${{ steps.meta.outputs.tags }}
       digest: ${{ steps.push.outputs.digest }}
@@ -42,32 +55,46 @@ jobs:
         id: package_version
         run: echo "version=$(node -p "require('./apps/relay/package.json').version")" >> $GITHUB_OUTPUT
 
+      - name: Get package versions for production build
+        id: npm_versions
+        if: matrix.build_type.name == 'production'
+        run: |
+          echo "common=$(npm view @evolu/common version)" >> $GITHUB_OUTPUT
+          echo "nodejs=$(npm view @evolu/nodejs version)" >> $GITHUB_OUTPUT
+
       - name: Extract metadata (tags, labels) for Docker
         id: meta
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=sha,prefix={{branch}}-
-            type=raw,value=latest,enable={{is_default_branch}}
-            type=raw,value=${{ steps.package_version.outputs.version }},enable={{is_default_branch}}
+            type=ref,event=branch,suffix=-${{ matrix.build_type.tag_suffix }}
+            type=ref,event=pr,suffix=-${{ matrix.build_type.tag_suffix }}
+            type=sha,prefix={{branch}}-,suffix=-${{ matrix.build_type.tag_suffix }}
+            type=raw,value=${{ matrix.build_type.tag_suffix }},enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ is_default_branch && matrix.build_type.name == 'production' }}
+            type=raw,value=${{ steps.package_version.outputs.version }},enable=${{ is_default_branch && matrix.build_type.name == 'production' }}
+          labels: |
+            org.opencontainers.image.title=Evolu Relay (${{ matrix.build_type.name }})
+            org.opencontainers.image.description=${{ matrix.build_type.description }}
 
       - name: Build and push Docker image
         id: push
         uses: docker/build-push-action@v6
         with:
           platforms: linux/amd64,linux/arm64
-          context: .
-          file: ./apps/relay/Dockerfile
+          context: ${{ matrix.build_type.context }}
+          file: ${{ matrix.build_type.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            ${{ matrix.build_type.name == 'production' && format('EVOLU_COMMON_VERSION={0}', steps.npm_versions.outputs.common) || '' }}
+            ${{ matrix.build_type.name == 'production' && format('EVOLU_NODEJS_VERSION={0}', steps.npm_versions.outputs.nodejs) || '' }}
           cache-from: |
-            type=gha,scope=relay/${{ github.ref_name }}
+            type=gha,scope=relay/${{ github.ref_name }}/${{ matrix.build_type.name }}
           cache-to: |
-            type=gha,scope=relay/${{ github.ref_name }},mode=min
+            type=gha,scope=relay/${{ github.ref_name }}/${{ matrix.build_type.name }},mode=min
           provenance: true
           sbom: true
 

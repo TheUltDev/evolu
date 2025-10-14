@@ -1,0 +1,91 @@
+# Production Dockerfile for Evolu Relay
+# This Dockerfile uses published NPM packages instead of building from monorepo source
+# It is optimized for production deployment with minimal image size and attack surface
+
+# Build arguments for package versions
+ARG EVOLU_COMMON_VERSION=latest
+ARG EVOLU_NODEJS_VERSION=latest
+ARG NODE_VERSION=22-alpine
+
+# ------------------------------------------------------------
+# Builder stage - install dependencies and build
+FROM node:${NODE_VERSION} AS builder
+
+# Set working directory
+WORKDIR /app
+
+# Enable pnpm via corepack
+RUN corepack enable pnpm
+
+# Copy only source and package files (not dependencies)
+COPY apps/relay/src ./src
+COPY apps/relay/tsconfig.json ./tsconfig.json
+
+# Create package.json using NPM packages instead of workspace dependencies
+ARG EVOLU_COMMON_VERSION
+ARG EVOLU_NODEJS_VERSION
+RUN echo "{\
+  \"name\": \"@evolu/relay\",\
+  \"version\": \"1.1.1\",\
+  \"private\": true,\
+  \"type\": \"module\",\
+  \"scripts\": {\
+    \"build\": \"tsc\"\
+  },\
+  \"dependencies\": {\
+    \"@evolu/common\": \"${EVOLU_COMMON_VERSION}\",\
+    \"@evolu/nodejs\": \"${EVOLU_NODEJS_VERSION}\"\
+  },\
+  \"devDependencies\": {\
+    \"@types/node\": \"^22.17.1\",\
+    \"typescript\": \"^5.9.2\"\
+  },\
+  \"engines\": {\
+    \"node\": \">=22.0.0\"\
+  }\
+}" > package.json
+
+# Install dependencies with frozen lockfile disabled (we're using fresh NPM packages)
+RUN pnpm install --no-frozen-lockfile
+
+# Build TypeScript to JavaScript
+RUN pnpm run build
+
+# Prune dev dependencies for smaller final image
+RUN pnpm prune --prod
+
+# ------------------------------------------------------------
+# Runner stage - minimal runtime image
+FROM node:${NODE_VERSION} AS runner
+
+# Set working directory
+WORKDIR /app
+
+# Install wget for health checks (minimal addition)
+RUN apk add --no-cache wget
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 evolu --ingroup nodejs
+
+# Create data directory with proper permissions
+RUN mkdir -p /app/data && chown -R evolu:nodejs /app
+
+# Copy only production dependencies and built files from builder
+COPY --from=builder --chown=evolu:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=evolu:nodejs /app/dist ./dist
+COPY --from=builder --chown=evolu:nodejs /app/package.json ./package.json
+
+# Switch to non-root user
+USER evolu
+
+# Expose WebSocket port
+EXPOSE 4000
+
+# Health check to ensure service is responding
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:4000 || exit 1
+
+# Start the relay server
+CMD ["node", "dist/index.js"]
+
